@@ -1,0 +1,3 @@
+class EhealthException(Exception):
+	pass
+	
