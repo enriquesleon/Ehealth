@@ -29,7 +29,8 @@ class EhealthConnection:
             self.__connection.open()
             self.__is_connection_alive = True
             self.__read_thread.start()
-            print('connection open')
+            self.__running_event.set()
+            logging.info('Connection Opened')
         except SerialException as e:
             logging.error(e)
             raise EhealthException('Could Not Open Connection')
@@ -37,6 +38,7 @@ class EhealthConnection:
     def __run_read(self):
         isRunning = True
         while isRunning is True:
+            self.__running_event.wait()
             try:
                 self.__serial_lock.acquire()
                 if self.__is_connection_alive:
@@ -73,6 +75,10 @@ class EhealthConnection:
             self.__is_connection_alive = False
         except:
             raise EhealthConnection('Could not close Connection')
+        finally:
+            self.__serial_lock.release()
+    def pause(self):
+        self.__running_event.clear()
 
 
 def main():

@@ -5,6 +5,7 @@ import logging
 from EhealthFileHandler import EhealthFileHandler as efh
 from EhealthDispatchHandler import EhealthDispatchHandler
 from EhealthSerial import EhealthSerial
+from EhealthConnection import EhealthConnection
 
 
 class EhealthReader:
@@ -21,7 +22,7 @@ class EhealthReader:
         end_time = self.runtime + time.time()
         while time.time() < end_time:
             try:
-                line = self.connection.readline().decode('ascii')
+                line = self.connection.readline()
             except Exception as e:
                 for handler in self.reponse_handlers:
                     handler.onError(e)
@@ -50,7 +51,9 @@ def main():
     parser.add_argument(
         '-t', '--time', nargs=1, metavar="Number of seconds to run", type=int, default=60, dest='runtime')
     args = parser.parse_args()
-    connection = EhealthSerial(args.port[0],9600, 1.5)
+    #connection = EhealthSerial(args.port[0],9600, 1.5)
+    connection = EhealthConnection(args.port[0],9600, 1.5)
+
 
     ecgfile = open("ecg.dat", 'w')
     afsfile = open('afs.dat', 'w')

@@ -1,4 +1,6 @@
 from EhealthException import EhealthException
+from collections import namedtuple
+Event = namedtuple('Event', 'event_type sensor_type time value raw')
 
 
 def parse(line):
@@ -8,7 +10,7 @@ def parse(line):
     except EhealthException as e:
         raise e
     else:
-        return (sensor_type, time, value)
+        return Event('Nothing', sensor_type, time, value, line)
 
 
 def __split_sensor_type(line):

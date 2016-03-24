@@ -1,5 +1,5 @@
 from EhealthException import EhealthException
-from Ehealthparser import parse
+import Ehealthparser
 
 
 class EhealthDispatchHandler:
@@ -9,16 +9,18 @@ class EhealthDispatchHandler:
     def onEvent(self, response):
 
         try:
-            sensor_type, time_value, reading_value = parse(response)
+            event = Ehealthparser.parse(response)
+            #sensor_type, time_value, reading_value = parse(response)
         except:
             pass
         else:
             if len(self.dispatch_dict) is not 0:
                 try:
-                    file_handler = self.dispatch_dict[str(sensor_type)]
-                    file_handler.onEvent(time_value + "," + reading_value)
+                    file_handler = self.dispatch_dict[str(event.sensor_type)]
+                    file_handler.onEvent(
+                        event.time_value + "," + event.reading_value)
                 except EhealthException as e:
-                    del self.dispatch_dict[str(sensor_type)]
+                    del self.dispatch_dict[str(event.sensor_type)]
                     raise e
                 except KeyError:
                     pass
