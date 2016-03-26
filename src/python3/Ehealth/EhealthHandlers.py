@@ -1,13 +1,14 @@
 
 from EhealthException import EhealthException
 from EhealthCallable import EhealthCallable
+import logging
 
 
 class EhealthFileHandler(EhealthCallable):
 
-    def __init__(self, file):
+    def __init__(self, file_n):
         EhealthCallable.__init__(self)
-        self.file = file
+        self.file = file_n
 
     def onEvent(self, event):
         try:
@@ -18,9 +19,12 @@ class EhealthFileHandler(EhealthCallable):
 
     def onStop(self):
         self.file.close()
+        print('closed')
 
     def onError(self, error):
         self.file.close()
+        logging.error(error)
+        print('closed')
 
 class EhealthEchoHandler(EhealthCallable):
     def __init__(self):
@@ -32,7 +36,8 @@ class EhealthEchoHandler(EhealthCallable):
 
 def filehandler(file_name):
     try:
-        file = open(file_name, 'w')
-        return EhealthFileHandler(file)
+        new_file = open(file_name, 'w')
+        return EhealthFileHandler(new_file)
     except IOError as e:
+        logging.error(e)
         raise e

@@ -2,23 +2,25 @@ import logging
 
 
 class EhealthFileHandler:
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, file_n):
+        self.file_n = file_n
 
     def onEvent(self, line):
 
         try:
-            self.file.write(line)
+            self.file_n.write(line)
         except Exception as e:
             self.onError(e)
             raise e
 
     def onError(self, error):
-        self.file.close()
+        self.file_n.close()
         logging.warn('Error in Writing File')
 
     def onStop(self):
-        self.file.close()
+        print('closed')
+        self.file_n.close()
+        logging.warn('file closed')
 
     def onStart(self):
     	pass

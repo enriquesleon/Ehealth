@@ -63,8 +63,7 @@ class EhealthConnection:
             try:
                 line = self.__responseq.get(timeout=1)
             except Queue.Empty:
-                pass
-                #raise EhealthException('Serial Read Error')
+                return None
             else:
                 return line
 
@@ -79,6 +78,7 @@ class EhealthConnection:
             self.__serial_lock.release()
     def pause(self):
         self.__running_event.clear()
+
 
 
 def main():

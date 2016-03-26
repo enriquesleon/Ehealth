@@ -5,6 +5,8 @@ import EhealthHandlers
 import Ehealthparser
 import threading
 import time
+import logging
+
 
 class Ehealth(EhealthCallable):
     def __init__(self, port, baud):
@@ -32,19 +34,28 @@ class Ehealth(EhealthCallable):
             self.__running_lock.acquire()
             self.__isAlive = False
             self.connection.close()
+            while True:
+                try:
+                    line = self.connection.readline()
+                    self.onEvent(line)
+                except EhealthException:
+                    break
+            self.onStop()
         except EhealthException as e:
             self.onErrorCallback(e)
         finally:
             self.__running_lock.release()
 
     def onEvent(self, event):
-        try:
-            new_event = Ehealthparser.parse(event)
-        except:
-            pass
-        else:
-            self.__alert_basic_handler(self.__callables, new_event)
-            self.__alert_sensor_handler(event)
+        if event is not None:
+            try:
+
+                new_event = Ehealthparser.parse(event)
+            except:
+                pass
+            else:
+                self.__alert_basic_handler(self.__callables, new_event)
+                self.__alert_sensor_handler(new_event)
 
     def onError(self, error):
         for handler in self.__callables:
@@ -60,11 +71,12 @@ class Ehealth(EhealthCallable):
             for handler in callable_list:
                 handler.onStop()
 
-    def __alert_basic_handler(self, callabes, event):
-        for handler in self.__callables:
+    def __alert_basic_handler(self, callables, event):
+        for handler in callables:
             try:
                 handler.onEvent(event)
-            except:
+            except Exception as e:
+                logging.warn(e + ": Handler Error")
                 self.__callables.remove(handler)
 
     def __alert_sensor_handler(self, event):
@@ -92,6 +104,7 @@ class Ehealth(EhealthCallable):
                 running = self.__isAlive
                 self.__running_lock.release()
 
+
     def set_BPM_callables(self, *callables):
         try:
             return self.__set_sensor_callable('BPM', callables)
@@ -118,7 +131,8 @@ class Ehealth(EhealthCallable):
 
     def set_callable(self, *callables):
         for handler in callables:
-            if not isinstance(handler,EhealthCallable):
+            if not isinstance(handler, EhealthCallable):
+                print(handler)
                 raise EhealthException(
                     'Callback Class is not of type EhealthCallable')
             else:
@@ -128,11 +142,17 @@ class Ehealth(EhealthCallable):
     def set_onError(self, onError):
         self.onErrorCallback = onError
 
-    def __set_sensor_callable(self, sensor_name, *callables):
+    def __set_sensor_callable(self, sensor_name, callables):
         for handler in callables:
+            print(handler.__class__.__name__)
             if not isinstance(handler, EhealthCallable):
                 raise EhealthException(
                     'Callback class is not of type EhealthCallable')
+        try:
+            call_list = self.__sensor_callables[sensor_name]
+        except KeyError:
+            self.__sensor_callables[sensor_name] = None
+
         if self.__sensor_callables[sensor_name] is None:
             self.__sensor_callables[sensor_name] = list(callables)
         else:
@@ -144,14 +164,28 @@ class Ehealth(EhealthCallable):
 
 
 def onError(error):
-	raise(error)
+    raise(error)
+
+
 def main():
     ehealth = Ehealth('/dev/cu.usbmodem1411', 9600)
+    afsfile = EhealthHandlers.filehandler('AFS.dat')
+    o2sfile = EhealthHandlers.filehandler('O2S.dat')
+
+    bpmfile = EhealthHandlers.filehandler('BPM.dat')
+
+    ecgfile = EhealthHandlers.filehandler('ECG.dat')
+
+    ehealth.set_Airflow_callables(afsfile)
+    ehealth.set_ECG_callables(ecgfile)
+    ehealth.set_BPM_callables(bpmfile)
+    ehealth.set_O2S_callables(o2sfile)
+
     ehealth.set_callable(EhealthHandlers.EhealthEchoHandler())
     ehealth.set_onError(onError)
     ehealth.start()
     start_time = time.time()
-    while time.time() < (start_time + 60):
+    while time.time() < (start_time + 20):
         pass
     ehealth.stop()
 
