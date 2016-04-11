@@ -29,6 +29,7 @@ def __split_value_time(reading):
         line_split = reading.split(',', 1)
         time = line_split[0]
         value = line_split[1]
+        float(value)
     except:
         raise EhealthException('Problem Parsing Time Value Pair: ' + reading)
     else:

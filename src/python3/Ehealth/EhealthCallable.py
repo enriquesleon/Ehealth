@@ -15,3 +15,5 @@ class EhealthCallable:
 
     def onStop(self):
         pass
+    def onConnect(self):
+        pass

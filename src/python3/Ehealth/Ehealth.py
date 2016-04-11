@@ -16,7 +16,7 @@ class Ehealth(EhealthCallable):
         self.port = port
         self.baud = baud
         self.__run_thread = threading.Thread(target=self.__run)
-        self.connection = EhealthConnection(self.port, self.baud, 1)
+        self.connection = EhealthConnection(self.port, self.baud, 3)
         self.onErrorCallback = None
         self.__running_lock = threading.Lock()
         self.__isAlive = False
@@ -26,14 +26,17 @@ class Ehealth(EhealthCallable):
             self.connection.open()
             self.__isAlive = True
             self.__run_thread.start()
-        except EhealthConnection as e:
+            print('Ehealth is running')
+        except EhealthException as e:
             raise e
 
     def stop(self):
         try:
+            print('stopping Ehealth')
             self.__running_lock.acquire()
             self.__isAlive = False
             self.connection.close()
+            logging.info('purging last messages')
             while True:
                 try:
                     line = self.connection.readline()
@@ -45,6 +48,10 @@ class Ehealth(EhealthCallable):
             self.onErrorCallback(e)
         finally:
             self.__running_lock.release()
+            print('Ehealth has Stopped')
+    def isRunning(self):
+        with self.__running_lock:
+            return self.__isAlive
 
     def onEvent(self, event):
         if event is not None:
@@ -52,6 +59,7 @@ class Ehealth(EhealthCallable):
 
                 new_event = Ehealthparser.parse(event)
             except:
+                logging.warn('parse error')
                 pass
             else:
                 self.__alert_basic_handler(self.__callables, new_event)
@@ -89,6 +97,7 @@ class Ehealth(EhealthCallable):
 
     def __run(self):
         running = True
+        logging.info('Ehealth thread running')
         while running:
             try:
                 self.__running_lock.acquire()
@@ -96,6 +105,7 @@ class Ehealth(EhealthCallable):
                     line = self.connection.readline()
                     self.onEvent(line)
             except Exception as e:
+                logging.error('Ehealth Run error' + str(e))
                 self.onError(e)
                 self.connection.close()
                 self.onErrorCallback(e)
