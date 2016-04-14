@@ -18,7 +18,7 @@ def valid_time(time__string_value):
 
 
 def run_ehealth(args):
-    eh = Ehealth.Ehealth(args.port[0], 9600)
+    eh = Ehealth.Ehealth(args.port[0], 115200)
 
     if args.all_sensors is True:
         eh.set_callable(EhealthHandlers.EhealthEchoHandler())

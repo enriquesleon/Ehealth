@@ -12,7 +12,7 @@ class EhealthFileHandler(EhealthCallable):
 
     def onEvent(self, event):
         try:
-            self.file.write(event.time + ',' + event.value)
+            self.file.write(event.time + ',' + event.value +'\n')
         except IOError as e:
             self.onError(e)
             raise EhealthException('Could not write to file')

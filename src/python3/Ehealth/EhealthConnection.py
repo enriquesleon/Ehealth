@@ -13,7 +13,7 @@ import time
 class EhealthConnection:
     def __init__(self, port, baud, timeout):
         self.port = port
-        self.baud = baud
+        self.baudrate = baud
         self.timeout = timeout
         self.__connection = serial.Serial()
         self.__read_thread = threading.Thread(target=self.__run_read)
@@ -25,16 +25,16 @@ class EhealthConnection:
     def open(self):
         try:
             self.__connection.port = self.port
-            self.__connection.baud = self.port
+            self.__connection.baudrate = self.baudrate
             self.__connection.timeout = self.timeout
             self.__connection.open()
-            self.__handshake()
+            #self.__handshake()
             self.__is_connection_alive = True
             self.__read_thread.start()
             self.__running_event.set()
 
             print(
-                'Serial Connection Open at:' + self.port + ":" + str(self.baud))
+                'Serial Connection Open at:' + self.port + ":" + str(self.__connection.baudrate))
             logging.info('Connection Opened')
         except SerialException as e:
             logging.error(e)
@@ -45,15 +45,16 @@ class EhealthConnection:
 
     def __run_read(self):
         isRunning = True
-        time.sleep(.1)
+        time.sleep(1)
         while isRunning is True:
             self.__running_event.wait()
             try:
-                #self.__serial_lock.acquire()
+                self.__serial_lock.acquire()
                 if self.__is_connection_alive:
                     if self.__connection.in_waiting > 0:
                         line = self.__read_line()
-                    self.__responseq.put(line)
+                        if line is not None:
+                            self.__responseq.put(line)
             except SerialException:
                 self.__connection.close()
                 logging.error('Serial Read Error')
@@ -63,7 +64,7 @@ class EhealthConnection:
                 pass
             finally:
                 isRunning = self.__is_connection_alive
-                #self.__serial_lock.release()
+                self.__serial_lock.release()
 
     def readline(self):
 
@@ -75,20 +76,19 @@ class EhealthConnection:
                 line = self.__responseq.get(timeout=.1)
             except Queue.Empty:
                 logging.info('Queue Empty')
-                return None
             else:
                 return line
 
     def close(self):
         try:
-            #self.__serial_lock.acquire()
-            #self.__connection.close()
+            self.__serial_lock.acquire()
+            self.__connection.close()
             self.__is_connection_alive = False
         except:
             raise EhealthConnection('Could not close Connection')
         finally:
             pass
-            #self.__serial_lock.release()
+            self.__serial_lock.release()
 
     def pause(self):
         self.__running_event.clear()
@@ -104,7 +104,7 @@ class EhealthConnection:
         while (not (self.__connection.in_waiting > 0)):
             pass
         try:
-            time.sleep(.1)
+            time.sleep(.5)
             cts = self.__connection.read(1).decode('ascii')
             if cts != 'c':
                 raise EhealthException
@@ -115,7 +115,7 @@ class EhealthConnection:
 
 
 def main():
-    connection = EhealthConnection('/dev/cu.usbmodem1411', 9600, 1)
+    connection = EhealthConnection('/dev/cu.usbmodem1411', 115200, 1)
     try:
         connection.open()
     except EhealthException as e:
@@ -123,7 +123,9 @@ def main():
         raise
     while True:
         try:
-            print(connection.readline())
+            line = connection.readline()
+            if line is not None:
+                print(line)
         except EhealthException as e:
             print(e)
             connection.close()

@@ -36,13 +36,14 @@ class Ehealth(EhealthCallable):
             self.__running_lock.acquire()
             self.__isAlive = False
             self.connection.close()
-            logging.info('purging last messages')
-            while True:
-                try:
-                    line = self.connection.readline()
-                    self.onEvent(line)
-                except EhealthException:
-                    break
+            #logging.info('purging last messages')
+            #while True:
+            #    try:
+            #        line = self.connection.readline()
+            #        if line is not None:
+            #            self.onEvent(line)
+            #    except EhealthException:
+            #        break
             self.onStop()
         except EhealthException as e:
             self.onErrorCallback(e)
@@ -55,15 +56,20 @@ class Ehealth(EhealthCallable):
 
     def onEvent(self, event):
         if event is not None:
-            try:
+            new_event = Ehealthparser.parse(event)
+            if new_event.event_type == 'Reading':
+                self.__alert_basic_handler(self.__callables,new_event)
+                for sensor_event in new_event.readings:
+                    self.__alert_sensor_handler(sensor_event)
+            #try:
 
-                new_event = Ehealthparser.parse(event)
-            except:
-                logging.warn('parse error')
-                pass
-            else:
-                self.__alert_basic_handler(self.__callables, new_event)
-                self.__alert_sensor_handler(new_event)
+                #new_event = Ehealthparser.parse(event)
+            #except:
+                #logging.warn('parse error')
+                #pass
+            #else:
+                #self.__alert_basic_handler(self.__callables, new_event)
+                #self.__alert_sensor_handler(new_event)
 
     def onError(self, error):
         for handler in self.__callables:
