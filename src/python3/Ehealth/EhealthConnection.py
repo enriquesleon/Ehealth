@@ -5,6 +5,7 @@ except:
     import queue as Queue
 import serial
 from serial import SerialException
+from serial import SerialTimeoutException
 from EhealthException import EhealthException
 import logging
 import time
@@ -52,34 +53,73 @@ class EhealthConnection:
             self.__running_event.wait()
             try:
                 self.__serial_lock.acquire()
-                if self.__is_connection_alive:
-                    if self.__connection.in_waiting > 0:
-                        line = self.__read_line()
-                        if line is not None:
-                            self.__responseq.put(line)
-            except SerialException:
-                self.__connection.close()
-                logging.error('Serial Read Error')
-                self.__is_connection_alive = False
-            except Queue.Full:
-                logging.warning('Queue Full')
-                pass
+                self.__read_into_queue()
+                #if self.__is_connection_alive:
+                #    if self.__connection.in_waiting > 0:
+                #        line = self.__read_line()
+                #        if line is not None:
+                #            self.__responseq.put(line)
+            except SerialException as e:
+                self.__serial_exception_handler(e)
+            except SerialTimeoutException as e:
+                self.__serial_exception_handler(e)
+            except UnicodeDecodeError as e:
+                self.__serial_exception_handler(e)
+                #self.__connection.close()
+                #logging.error('Serial Read Error')
+                #self.__is_connection_alive = False
+            #except Queue.Full:
+                #logging.warning('Queue Full')
+                #pass
             finally:
                 isRunning = self.__is_connection_alive
                 self.__serial_lock.release()
+    def __read_into_queue(self):
+        if self.__is_connection_alive:
+            try:
+                line = self.__read_line()
+                if line is not None:
+                    self.__responseq.put(SerialEvent('Response','New Response',line))
+            except:
+                raise
+    def __serial_exception_handler(self,e):
+        te = type(e)
+        if te is SerialException:
+            #self.__connection.close()
+            logging.error('Serial Read Error')
+            self.__is_connection_alive = False
+            self.__responseq.put(SerialEvent('Exception','SerialException',e))
+        if te is SerialTimeoutException:
+            logging.error('Serial Timeout')
+            self.__responseq.put(SerialEvent('Exception','SerialTimeout',e))
+        if te is UnicodeDecodeError:
+            logging.error('Could not decode Bytes')
+            self.__responseq.put(SerialEvent('Exception','DecodeException',e))
+        if te is Queue.Full:
+            logging.error('Queue is Full')
+            self.__responseq.put('Exception','QueueFull',e)
 
     def readline(self):
 
-        if self.__responseq.empty() and not self.__read_thread.is_alive():
-            raise EhealthException('Serial Read Error')
-            logging.warn('Serial Connection Error. Connection not Established')
+        #if self.__responseq.empty() and not self.__read_thread.is_alive():
+            #raise EhealthException('Serial Read Error')
+            #logging.warn('Serial Connection Error. Connection not Established')
+        #else:
+        #    try:
+        #        line = self.__responseq.get(timeout=.1)
+        #    except Queue.Empty:
+        #        logging.info('Queue Empty')
+        #    else:
+        #        return line
+        try:
+            line = self.__responseq.get(timeout = .1)
+        except Queue.Empty:
+            logging.info('Queue Empty')
+            return None
         else:
-            try:
-                line = self.__responseq.get(timeout=.1)
-            except Queue.Empty:
-                logging.info('Queue Empty')
-            else:
-                return line
+            return line
+
+
 
     def close(self):
         try:
@@ -99,8 +139,12 @@ class EhealthConnection:
         try:
             serial_line = self.__connection.readline()
             line = serial_line.decode('ascii')
-        except Exception as e:
-            raise EhealthException('Couldnt decode Bytes' + serial_line.decode('hex'))        
+        except SerialException:
+            raise 
+        except SerialTimeoutException:
+            raise
+        except UnicodeDecodeError:
+            raise       
         return line
     def __handshake(self):
         while (not (self.__connection.in_waiting > 0)):
@@ -122,18 +166,36 @@ def main():
         connection.open()
     except EhealthException as e:
         print(e)
-        raise
+    
     while True:
         try:
             line = connection.readline()
             if line is not None:
-                print(line)
-        except EhealthException as e:
-            print(e)
-            connection.close()
-            raise
+                if line.event_type == 'Exception':
+                    print(line.msg)
+                    #raise line.body
+                    break
+                if line.event_type == 'Response':
+                    print (line.body)
         except KeyboardInterrupt:
             connection.close()
-            raise
+
+
+    #while True:
+    #    try:
+    #        line = connection.readline()
+    #       if line is not None:
+    #            if line.event_type is 'Exception':
+    #                print('Exception')
+    #                break
+    #                #raise line.body
+    #           else:
+    #                print(line.body)
+    #    except EhealthException as e:
+    #        print(e)
+    #        connection.close()
+    #    except KeyboardInterrupt:
+    #        connection.close()
+    #        raise
 if __name__ == '__main__':
     main()
