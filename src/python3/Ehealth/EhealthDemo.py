@@ -16,7 +16,6 @@ def valid_time(time__string_value):
         raise argparse.ArgumentTypeError(
             'Time Input not valid.' + time__string_value)
 
-
 def run_ehealth(args):
     eh = Ehealth.Ehealth(args.port[0], 115200)
 

@@ -32,24 +32,16 @@ class Ehealth(EhealthCallable):
 
     def stop(self):
         try:
-            print('stopping Ehealth')
             self.__running_lock.acquire()
             self.__isAlive = False
             self.connection.close()
-            #logging.info('purging last messages')
-            #while True:
-            #    try:
-            #        line = self.connection.readline()
-            #        if line is not None:
-            #            self.onEvent(line)
-            #    except EhealthException:
-            #        break
             self.onStop()
         except EhealthException as e:
             self.onErrorCallback(e)
         finally:
             self.__running_lock.release()
             print('Ehealth has Stopped')
+
     def isRunning(self):
         with self.__running_lock:
             return self.__isAlive
@@ -58,18 +50,9 @@ class Ehealth(EhealthCallable):
         if event is not None:
             new_event = Ehealthparser.parse(event)
             if new_event.event_type == 'Reading':
-                self.__alert_basic_handler(self.__callables,new_event)
+                self.__alert_basic_handler(self.__callables, new_event)
                 for sensor_event in new_event.readings:
                     self.__alert_sensor_handler(sensor_event)
-            #try:
-
-                #new_event = Ehealthparser.parse(event)
-            #except:
-                #logging.warn('parse error')
-                #pass
-            #else:
-                #self.__alert_basic_handler(self.__callables, new_event)
-                #self.__alert_sensor_handler(new_event)
 
     def onError(self, error):
         for handler in self.__callables:
@@ -113,13 +96,13 @@ class Ehealth(EhealthCallable):
             except Exception as e:
                 logging.error('Ehealth Run error' + str(e))
                 self.onError(e)
-                self.connection.close()
+                # self.connection.close()
                 self.onErrorCallback(e)
                 self.__isAlive = False
             finally:
                 running = self.__isAlive
                 self.__running_lock.release()
-
+        print('exiting')
 
     def set_BPM_callables(self, *callables):
         try:
@@ -153,6 +136,7 @@ class Ehealth(EhealthCallable):
                     'Callback Class is not of type EhealthCallable')
             else:
                 self.__callables.extend(list(callables))
+                print('set callable')
         return self
 
     def set_onError(self, onError):
@@ -178,13 +162,26 @@ class Ehealth(EhealthCallable):
     def __send_command(self, command):
         pass
 
+    def register(self, *callbacks,sensor_type = None):
+        if sensor_type is None:
+            try:
+                self.set_callable(*callbacks)
+            except:
+                raise
+        else:
+            print(sensor_type)
+            try:
+                self.__set_sensor_callable(sensor_type, callbacks)
+            except:
+                raise
+
 
 def onError(error):
     raise(error)
 
 
 def main():
-    ehealth = Ehealth('/dev/cu.usbmodem1411', 9600)
+    ehealth = Ehealth('/dev/cu.usbmodem1411', 115200)
     afsfile = EhealthHandlers.filehandler('AFS.dat')
     o2sfile = EhealthHandlers.filehandler('O2S.dat')
 
@@ -192,17 +189,28 @@ def main():
 
     ecgfile = EhealthHandlers.filehandler('ECG.dat')
 
-    ehealth.set_Airflow_callables(afsfile)
-    ehealth.set_ECG_callables(ecgfile)
-    ehealth.set_BPM_callables(bpmfile)
-    ehealth.set_O2S_callables(o2sfile)
+    ehealth.register(afsfile,sensor_type = 'AFS')
+    ehealth.register(ecgfile,sensor_type = 'ECG')
+    ehealth.register(bpmfile,sensor_type = 'BPM')
+    ehealth.register(o2sfile,sensor_type ='O2S')
+    
+    ehealth.register(EhealthHandlers.EhealthEchoHandler())
+    #ehealth.set_Airflow_callables(afsfile)
+    #ehealth.set_ECG_callables(ecgfile)
+    #ehealth.set_BPM_callables(bpmfile)
+    #ehealth.set_O2S_callables(o2sfile)
 
-    ehealth.set_callable(EhealthHandlers.EhealthEchoHandler())
+    #ehealth.set_callable(EhealthHandlers.EhealthEchoHandler())
     ehealth.set_onError(onError)
     ehealth.start()
     start_time = time.time()
-    while time.time() < (start_time + 20):
-        pass
+    try:
+        while time.time() < (start_time + 20):
+            pass
+    except KeyboardInterrupt:
+        ehealth.stop()
+        raise
+
     ehealth.stop()
 
     pass
