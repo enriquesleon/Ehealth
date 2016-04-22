@@ -9,6 +9,8 @@ from EhealthException import EhealthException
 import logging
 import time
 
+from collections import namedtuple
+SerialEvent = namedtuple('SerialEvent','event_type msg body')
 
 class EhealthConnection:
     def __init__(self, port, baud, timeout):
