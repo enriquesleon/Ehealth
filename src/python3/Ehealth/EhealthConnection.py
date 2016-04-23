@@ -12,6 +12,7 @@ import time
 
 from collections import namedtuple
 SerialEvent = namedtuple('SerialEvent','event_type msg body')
+CommandEvent = namedtuple('CommandEvent','command_type msg')
 
 class EhealthConnection:
     def __init__(self, port, baud, timeout):
@@ -19,11 +20,12 @@ class EhealthConnection:
         self.baudrate = baud
         self.timeout = timeout
         self.__connection = serial.Serial()
-        self.__read_thread = threading.Thread(target=self.__run_read)
+        self.__read_thread = threading.Thread(target=self.__run_read,name = 'serial')
         self.__serial_lock = threading.Lock()
         self.__responseq = Queue.Queue()
         self.__running_event = threading.Event()
         self.__is_connection_alive = False
+        self.__commandq = Queue.Queue()
 
     def open(self):
         try:
@@ -53,7 +55,10 @@ class EhealthConnection:
             self.__running_event.wait()
             try:
                 self.__serial_lock.acquire()
-                self.__read_into_queue()
+                if not self.__commandq.empty():
+                    self.__command_handler()
+                else:
+                    self.__read_into_queue()
                 #if self.__is_connection_alive:
                 #    if self.__connection.in_waiting > 0:
                 #        line = self.__read_line()
@@ -74,6 +79,14 @@ class EhealthConnection:
             finally:
                 isRunning = self.__is_connection_alive
                 self.__serial_lock.release()
+                time.sleep(0)
+        print('serial finished')
+    def __command_handler(self):
+        command = self.__commandq.get()
+        if command.command_type == "Stop":
+            self.__connection.close()
+            self.__is_connection_alive = False
+
     def __read_into_queue(self):
         if self.__is_connection_alive:
             try:
@@ -122,15 +135,15 @@ class EhealthConnection:
 
 
     def close(self):
-        try:
-            self.__serial_lock.acquire()
-            self.__connection.close()
-            self.__is_connection_alive = False
-        except:
-            raise EhealthConnection('Could not close Connection')
-        finally:
-            pass
-            self.__serial_lock.release()
+        self.__commandq.put(CommandEvent('Stop','Normal Stop'))
+        #try:
+        #    self.__serial_lock.acquire()
+        #    self.__connection.close()
+        #    self.__is_connection_alive = False
+        #except:
+        #    raise EhealthConnection('Could not close Connection')
+        #finally:
+        #    self.__serial_lock.release()
 
     def pause(self):
         self.__running_event.clear()

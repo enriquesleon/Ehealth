@@ -23,7 +23,7 @@ class EhealthFileHandler(EhealthCallable):
 
     def onError(self, error):
         self.file.close()
-        logging.error(error)
+        #logging.error(error)
         print('closed')
 
 class EhealthEchoHandler(EhealthCallable):

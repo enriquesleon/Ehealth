@@ -6,6 +6,12 @@ import Ehealthparser
 import threading
 import time
 import logging
+from collections import namedtuple
+try:
+    import Queue as Queue
+except:
+    import queue as Queue
+EhealthEvent = namedtuple('EhealthEvent','event_type msg body')
 
 
 class Ehealth(EhealthCallable):
@@ -15,32 +21,46 @@ class Ehealth(EhealthCallable):
         self.__sensor_callables = {}
         self.port = port
         self.baud = baud
-        self.__run_thread = threading.Thread(target=self.__run)
         self.connection = EhealthConnection(self.port, self.baud, 3)
-        self.onErrorCallback = None
         self.__running_lock = threading.Lock()
+        self.__run_thread = threading.Thread(target=self.__run,name = 'ehealth')
+        self.onErrorCallback = None
         self.__isAlive = False
+        self.__messageq = Queue.Queue()
 
     def start(self):
         try:
             self.connection.open()
             self.__isAlive = True
             self.__run_thread.start()
-            print('Ehealth is running')
+            self.__messageq.put(EhealthEvent('EhealthStatus','Running','Ehealth is Running'))
         except EhealthException as e:
             raise e
 
     def stop(self):
-        try:
-            self.__running_lock.acquire()
-            self.__isAlive = False
-            self.connection.close()
-            self.onStop()
-        except EhealthException as e:
-            self.onErrorCallback(e)
-        finally:
-            self.__running_lock.release()
-            print('Ehealth has Stopped')
+        print (self.__run_thread.isAlive())
+
+        if not self.__run_thread.isAlive():
+            print (self.__run_thread.isAlive())
+            return 
+        else:
+            print('waiting on lock')
+            with self.__running_lock:
+                self.__isAlive = False
+                print('setting thread closed. is alive:' + str(self.__isAlive))
+                self.onStop()
+                self.connection.close()
+                print('connection closed')
+        #try:
+        #    self.__running_lock.acquire()
+        #    self.__isAlive = False
+        #    self.connection.close()
+        #    self.onStop()
+        #except EhealthException as e:
+        #    self.onErrorCallback(e)
+        #finally:
+        #    self.__running_lock.release()
+        #    print('Ehealth has Stopped')
 
     def isRunning(self):
         with self.__running_lock:
@@ -87,46 +107,50 @@ class Ehealth(EhealthCallable):
     def __run(self):
         running = True
         logging.info('Ehealth thread running')
-        while running:
-            try:
-                self.__running_lock.acquire()
+        while running is True:
+            with self.__running_lock:
                 if self.__isAlive:
                     line = self.connection.readline()
-                    self.onEvent(line)
-            except Exception as e:
-                logging.error('Ehealth Run error' + str(e))
-                self.onError(e)
-                # self.connection.close()
-                self.onErrorCallback(e)
-                self.__isAlive = False
-            finally:
+                    if line is not None:
+                        self.__handle_response(line)
                 running = self.__isAlive
-                self.__running_lock.release()
-        print('exiting')
+                    #print('exited')
+                    #time.sleep(0)
+            time.sleep(0)
 
-    def set_BPM_callables(self, *callables):
-        try:
-            return self.__set_sensor_callable('BPM', callables)
-        except EhealthException as e:
-            raise e
+   
 
-    def set_ECG_callables(self, *callables):
-        try:
-            return self.__set_sensor_callable('ECG', callables)
-        except EhealthException as e:
-            raise e
 
-    def set_O2S_callables(self, *callables):
-        try:
-            return self.__set_sensor_callable('O2S', callables)
-        except EhealthException as e:
-            raise e
-
-    def set_Airflow_callables(self, *callables):
-        try:
-            return self.__set_sensor_callable('AFS', callables)
-        except EhealthException as e:
-            raise e
+            #try:
+            #    self.__running_lock.acquire()
+            #    if self.__isAlive:
+            #        line = self.connection.readline()
+            #        if line is not None:
+            #            self.__handle_response(line)
+                    #self.onEvent(line)
+            #except Exception as e:
+            #    logging.error('Ehealth Run error' + str(e))
+            #    self.onError(e)
+                # self.connection.close()
+            #    self.onErrorCallback(e)
+            #    self.__isAlive = False
+            #finally:
+            #    running = self.__isAlive
+                #self.__running_lock.release()
+        print('Ehealth Finished')
+        self.__messageq.put(EhealthEvent('Ehealth','Stopped','Ehealth has Stopped'))
+    
+    def __handle_response(self,response):
+        if response.event_type == 'Exception':
+            exception_type = response.msg
+            if exception_type == 'SerialException' or exception_type == 'SerialTimeout':
+                self.onError(response.body)
+                self.onErrorCallback(response.body)
+                self.__messageq.put(EhealthEvent('EhealthError','Fatal Error',response.body))
+                self.__isAlive = False
+                print('is not alive')
+        if response.event_type == 'Response':
+            self.onEvent(response.body)
 
     def set_callable(self, *callables):
         for handler in callables:
@@ -174,10 +198,18 @@ class Ehealth(EhealthCallable):
                 self.__set_sensor_callable(sensor_type, callbacks)
             except:
                 raise
+    def read_ehealth_message(self):
+        try:
+            msg = self.__messageq.get(timeout = .1)
+        except:
+            return None
+        else:
+            return msg
+
 
 
 def onError(error):
-    raise(error)
+    print(error)
 
 
 def main():
@@ -192,7 +224,7 @@ def main():
     ehealth.register(afsfile,sensor_type = 'AFS')
     ehealth.register(ecgfile,sensor_type = 'ECG')
     ehealth.register(bpmfile,sensor_type = 'BPM')
-    ehealth.register(o2sfile,sensor_type ='O2S')
+    ehealth.register(o2sfile,sensor_type = 'O2S')
     
     ehealth.register(EhealthHandlers.EhealthEchoHandler())
     #ehealth.set_Airflow_callables(afsfile)
@@ -204,15 +236,26 @@ def main():
     ehealth.set_onError(onError)
     ehealth.start()
     start_time = time.time()
+    isRunning = True
     try:
-        while time.time() < (start_time + 20):
-            pass
+        while time.time() < (start_time + 10) and isRunning:
+            msg = ehealth.read_ehealth_message()
+            if msg is not None:
+                if msg.event_type == 'EhealthError':
+                    print(msg.msg)
+                    #ehealth.stop()
+                    break
+                    isRunning = False
+                if msg.event_type == "Ehealth":
+                    print (msg.msg)
     except KeyboardInterrupt:
         ehealth.stop()
         raise
-
+    print('break')
     ehealth.stop()
-
-    pass
+    print('finished')
+    print(threading.enumerate())
+    for t in threading.enumerate():
+        print (t.name)
 if __name__ == '__main__':
     main()
