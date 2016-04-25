@@ -20,11 +20,11 @@ def run_ehealth(args):
     eh = Ehealth.Ehealth(args.port[0], 115200)
 
     if args.all_sensors is True:
-        eh.set_callable(EhealthHandlers.EhealthEchoHandler())
-        eh.set_Airflow_callables(EhealthHandlers.filehandler('afs.dat'))
-        eh.set_BPM_callables(EhealthHandlers.filehandler('bpm.dat'))
-        eh.set_ECG_callables(EhealthHandlers.filehandler('ecg.dat'))
-        eh.set_O2S_callables(EhealthHandlers.filehandler('o2s.dat'))
+        eh.register(EhealthHandlers.EhealthEchoHandler())
+        eh.register(EhealthHandlers.filehandler('afs.dat'),sensor_type = 'AFS')
+        eh.register(EhealthHandlers.filehandler('bpm.dat'),sensor_type='BPM')
+        eh.register(EhealthHandlers.filehandler('ecg.dat'),sensor_type = 'ECG')
+        eh.register(EhealthHandlers.filehandler('o2s.dat'),sensor_type = 'O2S')
 
     else:
         if args.echo:

@@ -59,23 +59,12 @@ class EhealthConnection:
                     self.__command_handler()
                 else:
                     self.__read_into_queue()
-                #if self.__is_connection_alive:
-                #    if self.__connection.in_waiting > 0:
-                #        line = self.__read_line()
-                #        if line is not None:
-                #            self.__responseq.put(line)
             except SerialException as e:
                 self.__serial_exception_handler(e)
             except SerialTimeoutException as e:
                 self.__serial_exception_handler(e)
             except UnicodeDecodeError as e:
                 self.__serial_exception_handler(e)
-                #self.__connection.close()
-                #logging.error('Serial Read Error')
-                #self.__is_connection_alive = False
-            #except Queue.Full:
-                #logging.warning('Queue Full')
-                #pass
             finally:
                 isRunning = self.__is_connection_alive
                 self.__serial_lock.release()
@@ -113,17 +102,6 @@ class EhealthConnection:
             self.__responseq.put('Exception','QueueFull',e)
 
     def readline(self):
-
-        #if self.__responseq.empty() and not self.__read_thread.is_alive():
-            #raise EhealthException('Serial Read Error')
-            #logging.warn('Serial Connection Error. Connection not Established')
-        #else:
-        #    try:
-        #        line = self.__responseq.get(timeout=.1)
-        #    except Queue.Empty:
-        #        logging.info('Queue Empty')
-        #    else:
-        #        return line
         try:
             line = self.__responseq.get(timeout = .1)
         except Queue.Empty:
@@ -136,14 +114,6 @@ class EhealthConnection:
 
     def close(self):
         self.__commandq.put(CommandEvent('Stop','Normal Stop'))
-        #try:
-        #    self.__serial_lock.acquire()
-        #    self.__connection.close()
-        #    self.__is_connection_alive = False
-        #except:
-        #    raise EhealthConnection('Could not close Connection')
-        #finally:
-        #    self.__serial_lock.release()
 
     def pause(self):
         self.__running_event.clear()
@@ -186,29 +156,11 @@ def main():
             if line is not None:
                 if line.event_type == 'Exception':
                     print(line.msg)
-                    #raise line.body
                     break
                 if line.event_type == 'Response':
                     print (line.body)
         except KeyboardInterrupt:
             connection.close()
 
-
-    #while True:
-    #    try:
-    #        line = connection.readline()
-    #       if line is not None:
-    #            if line.event_type is 'Exception':
-    #                print('Exception')
-    #                break
-    #                #raise line.body
-    #           else:
-    #                print(line.body)
-    #    except EhealthException as e:
-    #        print(e)
-    #        connection.close()
-    #    except KeyboardInterrupt:
-    #        connection.close()
-    #        raise
 if __name__ == '__main__':
     main()
