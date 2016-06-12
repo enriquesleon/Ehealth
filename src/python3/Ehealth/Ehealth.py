@@ -47,19 +47,10 @@ class Ehealth(EhealthCallable):
             raise e
 
     def stop(self):
-        print (self.__run_thread.isAlive())
-
-        if not self.__run_thread.isAlive():
-            print (self.__run_thread.isAlive())
-            return
-        else:
-            print('waiting on lock')
-            with self.__running_lock:
-                self.__isAlive = False
-                print('setting thread closed. is alive:' + str(self.__isAlive))
-                self.onStop()
-                self.connection.close()
-                print('connection closed')
+        with self.__running_lock:
+            self.__isAlive = False
+            self.onStop()
+            self.connection.close()
 
     def isRunning(self):
         with self.__running_lock:
@@ -115,7 +106,6 @@ class Ehealth(EhealthCallable):
                 running = self.__isAlive
 
             time.sleep(0)
-        print('Ehealth Finished')
         self.__messageq.put(
             EhealthEvent('Ehealth', 'Stopped', 'Ehealth has Stopped'))
 
@@ -143,7 +133,6 @@ class Ehealth(EhealthCallable):
                     'Callback Class is not of type EhealthCallable')
             else:
                 self.__callables.extend(list(callables))
-                print('set callable')
         return self
 
     def set_onError(self, onError):
@@ -176,7 +165,6 @@ class Ehealth(EhealthCallable):
             except:
                 raise
         else:
-            print(sensor_type)
             try:
                 self.__set_sensor_callable(sensor_type, callbacks)
             except:
@@ -228,11 +216,6 @@ def main():
     except KeyboardInterrupt:
         ehealth.stop()
         raise
-    print('break')
     ehealth.stop()
-    print('finished')
-    print(threading.enumerate())
-    for t in threading.enumerate():
-        print (t.name)
 if __name__ == '__main__':
     main()

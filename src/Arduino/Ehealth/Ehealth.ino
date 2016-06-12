@@ -2,44 +2,40 @@
 #include <PinChangeInt.h>
 
 int cont = 0;
-unsigned long timeValue =0;
+unsigned long ntimeValue =0;
+unsigned long ctimeValue =0;
 int i = 1;
+unsigned int baud = 9600;
 const char cts = 'o';
 char buf[64];
+unsigned int time_d =100;
 boolean connection_open = false;
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(baud);
   PCintPort::attachInterrupt(6, readPulsioximeter, RISING);
 
 
 }
 
 void loop() {
+
   /*while(!connection_open){
     boolean connection_status = handshake();
     if (connection_status){
       connection_open = true;
     }
   }*/
-  //timeValue = millis(); 
-  //sendECG(timeValue);
-  //sendAirflow(timeValue);
-  //if (i == 1){
-    //sendBPM(timeValue);
-    //sendO2S(timeValue);
-  //}
-  Serial.print(String(millis()));
-  Serial.print(ecg());
-  Serial.print(airflow());
-  Serial.print(bpm());
-  Serial.print(O2S());
-  Serial.print('\n');
-  
-  i++;
-  i = i%100;
-  
-  delay(100);
+  ctimeValue = millis();
+  if((ctimeValue/time_d) != (ntimeValue/time_d)){
+      Serial.print(String(ctimeValue));
+      Serial.print(ecg());
+      Serial.print(airflow());
+      Serial.print(bpm());
+      Serial.print(O2S());
+      Serial.print('\n');
+  }
+  ntimeValue = ctimeValue;
 }
 
 String ecg(){

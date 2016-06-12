@@ -69,7 +69,6 @@ class EhealthConnection:
                 isRunning = self.__is_connection_alive
                 self.__serial_lock.release()
                 time.sleep(0)
-        print('serial finished')
     def __command_handler(self):
         command = self.__commandq.get()
         if command.command_type == "Stop":
